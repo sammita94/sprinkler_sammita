@@ -20,11 +20,11 @@ struct database_client_structure
 struct client_structure
 {
     int client_id;
-    int path[100];
+    list<int> path;
     int no_of_AP;
     int present_AP_id;
     struct database_client_structure database_client;
-    pair <int,int> co_ordinates_client;
+    pair <float,float> co_ordinates_client;
     int state;
     int next_AP_id;
 
@@ -43,7 +43,7 @@ struct AP_structure
     int AP_id;
     pair <float,float>  AP_coordinates;
     request_client_to_AP request_sheet[300];
-    int chunks_present_in_AP[300];
+    list<int> chunks_present_in_AP;
     int no_of_chunks_present_in_AP;
 };
 
@@ -65,7 +65,7 @@ void assign_path_to_client(client_structure &obj,int path_no)
         }
         else
         {
-            obj.path[k++]=res;
+            obj.path.push_back(res);
             res=0;
             co++;
         }
@@ -100,7 +100,7 @@ void assign_chunks(AP_structure &obj,int id)
             res=res*10 + line[j]-'0';
         else
         {
-            obj.chunks_present_in_AP[res]=1;
+            obj.chunks_present_in_AP.push_back(res);
             res=0;
         }
 
@@ -115,7 +115,7 @@ void initialize_position(client_structure &obj,int i,int path_no)
     obj.client_id=i;
     obj.present_AP_id=-1;
     obj.database_client.no_of_chunks_present_in_client=0;
-    obj.next_AP_id=obj.path[0];
+    obj.next_AP_id=obj.path.front();
 }
 
 void assign_coordinates(AP_structure &obj,int id)
@@ -143,7 +143,7 @@ void assign_coordinates(AP_structure &obj,int id)
 
 int main(int arg, char *argv[])
 {
-    if(arg!=5)
+    if(arg!=7)
         exit(0);
 
     float percent_set_up=0.15;
@@ -158,6 +158,7 @@ int main(int arg, char *argv[])
     int tot_no_of_AP=stoi(argv[4],nullptr,10);
     int no_of_clients=no_of_clients_per_path*no_of_paths;
     int no_of_chunks=stoi(argv[5],nullptr,10);
+    int inter_ap_dist=stoi(argv[6],nullptr,10);
 
     client_structure *clients=new client_structure[no_of_clients];
     AP_structure *APs=new AP_structure[tot_no_of_AP];
@@ -235,7 +236,68 @@ int main(int arg, char *argv[])
             chunks[i].packets_download_time[k++]=stof(res,nullptr);
         }
     }
+
+    /*Running the main loop*/
+    int reached=0;
+    int *position_file=new int[no_of_clients];
+    int *current_chunk=new int[no_of_clients];
+    memset(current_chunk,1,sizeof(current_chunk));
+    memset(position_file,0,sizeof(position_file));
+    string coor,p1=".txt";
+    char c;
+    ifstream work;
+    float dist,x,y;
+    for(float tick=0;reached<no_of_clients;tick=tick+tick_time)
+    {
+            for(int present_client=0;present_client<no_of_clients;present_client++)
+            {
+                ostringstream buffer;
+                buffer<<"client_"<<present_client;
+                s1=buffer.str();
+                s1+=p1;
+                work.open(s1.c_str());
+                seekg(position_file[present_client]);
+                work>>c;
+                while(c!=' ')
+                {
+                    res+=c;
+                    work>>c;
+                }
+                clients[present_client].co_ordinates_client.first=stof(res,nullptr);
+                work>>c;
+                while(c!=',')
+                {
+                    res+=c;
+                    work>>c;
+                }
+                position_file[present_client]=work.tellg()+1;
+                clients[present_client].co_ordinates_client.second=stof(res,nullptr);
+                if(clients[present_client].state==0)
+                {
+                    x=clients[present_client].co_ordinates_client.first-APs[clients[present_client].next_AP_id].AP_coordinates.first;
+                    y=clients[present_client].co_ordinates_client.second-APs[clients[present_client].next_AP_id].AP_coordinates.second;
+                    dist=(float)sqrt(pow(x,2)+pow(y,2));
+                    if(dist<=inter_ap_dist)
+                    {
+                        clients[present_client].present_AP_id=clients[present_client].next_AP_id;
+                        clients[present_client].path.pop_front();
+                        clients[present_client].next_AP_id=clients[present_client].path.front();
+                        clients[present_client].state=1;
+                    }
+                    else
+                        continue;
+                }
+                if(clients[present_client].state==1)
+                {
+                    x=clients[present_client].co_ordinates_client.first-APs[clients[present_client].present_AP_id].AP_coordinates.first;
+                    y=clients[present_client].co_ordinates_client.second-APs[clients[present_client].present_AP_id].AP_coordinates.second;
+                    dist=(float)sqrt(pow(x,2)+pow(y,2));
+
+                }
+            }
+    }
     return 0;
+
 
 }
 
