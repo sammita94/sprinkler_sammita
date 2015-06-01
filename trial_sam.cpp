@@ -1,7 +1,6 @@
 #include<bits/stdc++.h>
 using namespace std;
 
-
 struct chunk_structure
 {
     int no_of_packets;
@@ -12,18 +11,20 @@ struct chunk_structure
 
 struct database_client_structure
 {
-    chunk_structure chunk[100];
+    chunk_structure *chunk_present;
     int no_of_chunks_present_in_client;
-
+    int chunk_id_playing;
+    chunk_structure chunk_playing;
 };
 
 struct client_structure
 {
     int client_id;
     list<int> path;
+    list<int> faulty_aps;
     int no_of_AP;
     int present_AP_id;
-    struct database_client_structure database_client;
+    database_client_structure database_client;
     pair <float,float> co_ordinates_client;
     int state;
     int next_AP_id;
@@ -32,10 +33,8 @@ struct client_structure
 
 struct request_client_to_AP
 {
-    int client_id_to_AP;
-    int status_client;
-    int download_request;
-    int download_chunk;
+    int no_of_chunks_to_download;
+    list<chunk_structure> download_chunk;
 };
 
 struct AP_structure
@@ -139,7 +138,21 @@ void assign_coordinates(AP_structure &obj,int id)
 
 }
 
+request_client_to_AP make_request(client_structure &client,AP_structure &AP)
+{
+    request_client_to_AP request;
+    request.no_of_chunks_to_download=0;
+    for (list<int>::iterator it=AP.chunks_present_in_AP.begin(); it != AP.chunks_present_in_AP.end(); ++it)
+    {
+        if(client.database_client.chunk[*it].chunk_present!=1)
+        {
+            request.no_of_chunks_to_download++;
+            request.download_chunk.push_back(*it);
 
+        }
+    }
+    return request;
+}
 
 int main(int arg, char *argv[])
 {
@@ -188,12 +201,21 @@ int main(int arg, char *argv[])
             random_paths[countt++]=r;
         }
     }
+
     /*initializing clients structure*/
     for(i=0;i<no_of_clients;i++)
     {
 
         k=i/no_of_paths;
         initialize_position(clients[i],i,random_paths[k]);
+        clients[i].database_client.no_of_chunks_present_in_client=0;
+        clients[i].database_client.chunk_id_playing=0;
+        clients[i].database_client.chunk_present=new chunk_structure[no_of_chunks];
+        for(int j=1;j<=no_of_chunks;j++)
+        {
+            clients[i].database_client.chunk_present.chunk_present=0;
+            clients[i].database_client.chunk_present.no_of_packets=0;
+        }
     }
 
     /*Initializing AP with chunks and co-ordinates*/
@@ -217,6 +239,7 @@ int main(int arg, char *argv[])
             if(ran<=randomize)
             {
                faulty_ap_handle<<j<<" ";
+               clients[i].faulty_aps.push_back(j);
             }
         }
         faulty_ap_handle<<"\n";
@@ -240,61 +263,84 @@ int main(int arg, char *argv[])
     /*Running the main loop*/
     int reached=0;
     int *position_file=new int[no_of_clients];
-    int *current_chunk=new int[no_of_clients];
-    memset(current_chunk,1,sizeof(current_chunk));
+    int *index_of_chunk=new int[no_of_clients];
+    memset(index_of_chunk,0,sizeof(index_of_chunk));
     memset(position_file,0,sizeof(position_file));
     string coor,p1=".txt";
     char c;
     ifstream work;
     float dist,x,y;
+    request_client_to_AP request;
     for(float tick=0;reached<no_of_clients;tick=tick+tick_time)
     {
-            for(int present_client=0;present_client<no_of_clients;present_client++)
-            {
-                ostringstream buffer;
-                buffer<<"client_"<<present_client;
-                s1=buffer.str();
-                s1+=p1;
-                work.open(s1.c_str());
-                seekg(position_file[present_client]);
-                work>>c;
-                while(c!=' ')
-                {
-                    res+=c;
-                    work>>c;
-                }
-                clients[present_client].co_ordinates_client.first=stof(res,nullptr);
-                work>>c;
-                while(c!=',')
-                {
-                    res+=c;
-                    work>>c;
-                }
-                position_file[present_client]=work.tellg()+1;
-                clients[present_client].co_ordinates_client.second=stof(res,nullptr);
-                if(clients[present_client].state==0)
-                {
-                    x=clients[present_client].co_ordinates_client.first-APs[clients[present_client].next_AP_id].AP_coordinates.first;
-                    y=clients[present_client].co_ordinates_client.second-APs[clients[present_client].next_AP_id].AP_coordinates.second;
-                    dist=(float)sqrt(pow(x,2)+pow(y,2));
-                    if(dist<=inter_ap_dist)
-                    {
-                        clients[present_client].present_AP_id=clients[present_client].next_AP_id;
-                        clients[present_client].path.pop_front();
-                        clients[present_client].next_AP_id=clients[present_client].path.front();
-                        clients[present_client].state=1;
-                    }
-                    else
-                        continue;
-                }
-                if(clients[present_client].state==1)
-                {
-                    x=clients[present_client].co_ordinates_client.first-APs[clients[present_client].present_AP_id].AP_coordinates.first;
-                    y=clients[present_client].co_ordinates_client.second-APs[clients[present_client].present_AP_id].AP_coordinates.second;
-                    dist=(float)sqrt(pow(x,2)+pow(y,2));
 
+        for(int present_client=0;present_client<no_of_clients;present_client++)
+        {
+            if(clients[present_client].database_client.chunk_id_playing==1)
+            {
+                if(clients[present_client].database_client.chunk_present.packets_present[0]==1 && clients[present_client].database_client.chunk_present.packets_present[1]==0)
+                {
+                    clients[present_client].database_client.chunk_playing.packets_download_time[index_of_chunk]
                 }
             }
+            ostringstream buffer;
+            buffer<<"client_"<<present_client;
+            s1=buffer.str();
+            s1+=p1;
+            work.open(s1.c_str());
+            seekg(position_file[present_client]);
+            work>>c;
+            while(c!=' ')
+            {
+                res+=c;
+                work>>c;
+            }
+            clients[present_client].co_ordinates_client.first=stof(res,nullptr);
+            work>>c;
+            while(c!=',')
+            {
+                res+=c;
+                work>>c;
+            }
+            position_file[present_client]=work.tellg()+1;
+            clients[present_client].co_ordinates_client.second=stof(res,nullptr);
+            work.close();
+            if(clients[present_client].state==0)
+            {
+                x=clients[present_client].co_ordinates_client.first-APs[clients[present_client].next_AP_id].AP_coordinates.first;
+                y=clients[present_client].co_ordinates_client.second-APs[clients[present_client].next_AP_id].AP_coordinates.second;
+                dist=(float)sqrt(pow(x,2)+pow(y,2));
+                if(dist<=inter_ap_dist)
+                {
+                    clients[present_client].present_AP_id=clients[present_client].next_AP_id;
+                    clients[present_client].path.pop_front();
+                    clients[present_client].next_AP_id=clients[present_client].path.front();
+                    clients[present_client].state=1;
+                }
+                else
+                    continue;
+            }
+            if(clients[present_client].state==1)
+            {
+                if(find(clients[present_client].faulty_aps.begin(),clients[present_client].faulty_aps.end(),clients[present_client].present_AP_id)!=clients[present_client].faulty_aps.end())
+                {
+                    clients[present_client].state=0;
+                    continue;
+                }
+                x=clients[present_client].co_ordinates_client.first-APs[clients[present_client].present_AP_id].AP_coordinates.first;
+                y=clients[present_client].co_ordinates_client.second-APs[clients[present_client].present_AP_id].AP_coordinates.second;
+                dist=(float)sqrt(pow(x,2)+pow(y,2));
+                if(dist<=inter_ap_dist)
+                {
+                    request=make_request(clients[present_client],APs[clients[present_client].present_AP_id]);
+                    clients[present_client].state=2;
+                }
+            }
+            if(clients[present_client].state==2)
+            {
+                    if()
+            }
+        }
     }
     return 0;
 
