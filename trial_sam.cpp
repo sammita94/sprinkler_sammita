@@ -4,7 +4,6 @@ using namespace std;
 struct chunk_structure
 {
     int no_of_packets;
-    float packets_download_time[3000];
     int packets_present[3000];
     int chunk_present;
 };
@@ -144,7 +143,7 @@ request_client_to_AP make_request(client_structure &client,AP_structure &AP)
     request.no_of_chunks_to_download=0;
     for (list<int>::iterator it=AP.chunks_present_in_AP.begin(); it != AP.chunks_present_in_AP.end(); ++it)
     {
-        if(client.database_client.chunk[*it].chunk_present!=1)
+        if(client.database_client.chunk_present[*it].chunk_present!=1 || client.database_client.chunk_present[*it].no_of_packets<2000)
         {
             request.no_of_chunks_to_download++;
             request.download_chunk.push_back(*it);
@@ -152,6 +151,18 @@ request_client_to_AP make_request(client_structure &client,AP_structure &AP)
         }
     }
     return request;
+}
+
+void write_to_file(int client_no,int chunk_no,int packet_no)
+{
+    string p1="client_output_",line;
+    p1=p1+to_string(client_no);
+    p1=p1+".txt";
+    ofstream work;
+    work1.open(p1.c_str());
+    line=line+to_string(chunk_no)+":"+to_string(packet_no)+"\n";
+    work.close();
+
 }
 
 int main(int arg, char *argv[])
@@ -209,7 +220,8 @@ int main(int arg, char *argv[])
         k=i/no_of_paths;
         initialize_position(clients[i],i,random_paths[k]);
         clients[i].database_client.no_of_chunks_present_in_client=0;
-        clients[i].database_client.chunk_id_playing=0;
+        clients[i].database_client.chunk_playing.chunk_present=0;
+        clients[i].database_client.chunk_playing.no_of_packets=0;
         clients[i].database_client.chunk_present=new chunk_structure[no_of_chunks];
         for(int j=1;j<=no_of_chunks;j++)
         {
@@ -246,43 +258,31 @@ int main(int arg, char *argv[])
     }
     faulty_ap_handle.close();
 
-    /*Initialize the download time of the chunks*/
-    fstream chunk_handle("chunk_packet.txt", ios_base::in);
-    for(i=1;i<=no_of_chunks;i++)
-    {
-        getline(chunk_handle,line);
-        string res="";k=0;
-        for(int j=0;line[j]!='\0';j++)
-        {
-            while(line[j]!=' ')
-                res+=line[j];
-            chunks[i].packets_download_time[k++]=stof(res,nullptr);
-        }
-    }
 
     /*Running the main loop*/
     int reached=0;
-    int *position_file=new int[no_of_clients];
-    int *index_of_chunk=new int[no_of_clients];
-    memset(index_of_chunk,0,sizeof(index_of_chunk));
+    int *position_file = new int[no_of_clients];
+    int *index_of_packet_playing = new int[no_of_clients];
+    int *index_of_chunk_downloading = new int[no_of_clients];
+    int *index_of_chunk_playing = new int[no_of_clients];
+    int *index_of_packet_downloading = new int[no_of_clients];
+
+    memset(index_of_packet_playing,0,sizeof(index_of_packet_downloading));
+    memset(index_of_packet_downloading,0,sizeof(index_of_packet_playing));
+    memset(index_of_chunk_downloading,0,sizeof(index_of_chunk_downloading));
+    memset(index_of_chunk_playing,0,sizeof(index_of_chunk_playing));
     memset(position_file,0,sizeof(position_file));
-    string coor,p1=".txt";
+    string coor,p1=".txt",s1;
     char c;
     ifstream work;
     float dist,x,y;
-    request_client_to_AP request;
+    request_client_to_AP *request = new request_client_to_AP[no_of_clients];
     for(float tick=0;reached<no_of_clients;tick=tick+tick_time)
     {
 
         for(int present_client=0;present_client<no_of_clients;present_client++)
         {
-            if(clients[present_client].database_client.chunk_id_playing==1)
-            {
-                if(clients[present_client].database_client.chunk_present.packets_present[0]==1 && clients[present_client].database_client.chunk_present.packets_present[1]==0)
-                {
-                    clients[present_client].database_client.chunk_playing.packets_download_time[index_of_chunk]
-                }
-            }
+
             ostringstream buffer;
             buffer<<"client_"<<present_client;
             s1=buffer.str();
@@ -332,19 +332,62 @@ int main(int arg, char *argv[])
                 dist=(float)sqrt(pow(x,2)+pow(y,2));
                 if(dist<=inter_ap_dist)
                 {
-                    request=make_request(clients[present_client],APs[clients[present_client].present_AP_id]);
+                    request[present_client]=make_request(clients[present_client],APs[clients[present_client].present_AP_id]);
                     clients[present_client].state=2;
+                }
+                else
+                {
+                    clients[present_client].state=0;
+                    continue;
                 }
             }
             if(clients[present_client].state==2)
             {
-                    if()
+                x=clients[present_client].co_ordinates_client.first-APs[clients[present_client].present_AP_id].AP_coordinates.first;
+                y=clients[present_client].co_ordinates_client.second-APs[clients[present_client].present_AP_id].AP_coordinates.second;
+                dist=(float)sqrt(pow(x,2)+pow(y,2));
+                int flag=0;
+                if(dist<=inter_ap_dist)
+                {
+                    while(!request[present_client].download_chunk.empty())
+                    {
+                        if(index_of_packet_downloading[present_client]>2000 || index_of_packet_downloading[present_client]==0)
+                        {
+                            index_of_chunk_downloading[present_client]=request.download_chunk.front();
+                            index_of_packet_downloading[present_client]=clients[present_client].database_client.chunk_present[index_of_chunk_downloading].no_of_packets;
+                            request[present_client].download_chunk.pop_front();
+                        }
+
+                        clients[present_client].database_client.chunk_present[index_of_chunk_downloading[present_client]].chunk_present=1;
+                        clients[present_client].database_client.chunk_present[index_of_chunk_downloading[present_client]].no_of_packets++;
+                        index_of_packet_downloading[present_client]++;
+                    }
+
+                }
+                else
+                {
+                    clients[present_client].state=0;
+                    continue;
+                }
             }
+            if(tick%45==0)
+            {
+                if(clients[present_client].database_client.chunk_playing.no_of_packets==2000)
+                {
+                    clients[present_client].database_client.chunk_playing.chunk_present++;
+                }
+                else
+                    clients[present_client].database_client.chunk_playing.no_of_packets++;
+                if(clients[present_client].database_client.chunk_present[clients[present_client].database_client.chunk_playing.chunk_present].no_of_packets<clients[present_client].database_client.chunk_playing.no_of_packets)
+                {
+                    write_to_file(present_client,clients[present_client].database_client.chunk_playing.chunk_present,clients[present_client].database_client.chunk_playing.no_of_packets);
+                    clients[present_client].database_client.chunk_present[clients[present_client].database_client.chunk_playing.chunk_present].no_of_packets = clients[present_client].database_client.chunk_playing.no_of_packets
+            }
+            if((clients[present_client].database_client.chunk_playing.chunk_present==no_of_chunks && clients[present_client].database_client.chunk_playing.no_of_packets>=2000) || !clients[present_client].next_AP_id)
+                reached++;
         }
     }
     return 0;
-
-
 }
 
 
