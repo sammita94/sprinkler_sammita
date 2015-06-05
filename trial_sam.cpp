@@ -33,7 +33,7 @@ struct client_structure
 struct request_client_to_AP
 {
     int no_of_chunks_to_download;
-    list<chunk_structure> download_chunk;
+    list<int> download_chunk;
 };
 
 struct AP_structure
@@ -108,7 +108,6 @@ void assign_chunks(AP_structure &obj,int id)
 
 void initialize_position(client_structure &obj,int i,int path_no)
 {
-    memset(obj.path,0,sizeof(obj.path));
     assign_path_to_client(obj,path_no);
     obj.client_id=i;
     obj.present_AP_id=-1;
@@ -159,8 +158,8 @@ void write_to_file(int client_no,int chunk_no,int packet_no)
     p1=p1+to_string(client_no);
     p1=p1+".txt";
     ofstream work;
-    work1.open(p1.c_str());
-    line=line+to_string(chunk_no)+":"+to_string(packet_no)+"\n";
+    work.open(p1.c_str());
+    line = line + to_string(chunk_no) + ":" + to_string(packet_no) + "\n";
     work.close();
 
 }
@@ -225,8 +224,8 @@ int main(int arg, char *argv[])
         clients[i].database_client.chunk_present=new chunk_structure[no_of_chunks];
         for(int j=1;j<=no_of_chunks;j++)
         {
-            clients[i].database_client.chunk_present.chunk_present=0;
-            clients[i].database_client.chunk_present.no_of_packets=0;
+            clients[i].database_client.chunk_present[j].chunk_present=0;
+            clients[i].database_client.chunk_present[j].no_of_packets=0;
         }
     }
 
@@ -261,7 +260,7 @@ int main(int arg, char *argv[])
 
     /*Running the main loop*/
     int reached=0;
-    int *position_file = new int[no_of_clients];
+    long int* position_file = new long int[no_of_clients];
     int *index_of_packet_playing = new int[no_of_clients];
     int *index_of_chunk_downloading = new int[no_of_clients];
     int *index_of_chunk_playing = new int[no_of_clients];
@@ -272,7 +271,7 @@ int main(int arg, char *argv[])
     memset(index_of_chunk_downloading,0,sizeof(index_of_chunk_downloading));
     memset(index_of_chunk_playing,0,sizeof(index_of_chunk_playing));
     memset(position_file,0,sizeof(position_file));
-    string coor,p1=".txt",s1;
+    string coor,res,p1=".txt",s1;
     char c;
     ifstream work;
     float dist,x,y;
@@ -288,7 +287,7 @@ int main(int arg, char *argv[])
             s1=buffer.str();
             s1+=p1;
             work.open(s1.c_str());
-            seekg(position_file[present_client]);
+            work.seekg(position_file[present_client]);
             work>>c;
             while(c!=' ')
             {
@@ -302,7 +301,7 @@ int main(int arg, char *argv[])
                 res+=c;
                 work>>c;
             }
-            position_file[present_client]=work.tellg()+1;
+            position_file[present_client]=(long int)work.tellg()+1;
             clients[present_client].co_ordinates_client.second=stof(res,nullptr);
             work.close();
             if(clients[present_client].state==0)
@@ -353,8 +352,8 @@ int main(int arg, char *argv[])
                     {
                         if(index_of_packet_downloading[present_client]>2000 || index_of_packet_downloading[present_client]==0)
                         {
-                            index_of_chunk_downloading[present_client]=request.download_chunk.front();
-                            index_of_packet_downloading[present_client]=clients[present_client].database_client.chunk_present[index_of_chunk_downloading].no_of_packets;
+                            index_of_chunk_downloading[present_client]=request[present_client].download_chunk.front();
+                            index_of_packet_downloading[present_client]=clients[present_client].database_client.chunk_present[index_of_chunk_downloading[present_client]].no_of_packets;
                             request[present_client].download_chunk.pop_front();
                         }
 
@@ -370,7 +369,7 @@ int main(int arg, char *argv[])
                     continue;
                 }
             }
-            if(tick%45==0)
+            if(tick/45>0 && tick/45<1)
             {
                 if(clients[present_client].database_client.chunk_playing.no_of_packets==2000)
                 {
@@ -381,7 +380,8 @@ int main(int arg, char *argv[])
                 if(clients[present_client].database_client.chunk_present[clients[present_client].database_client.chunk_playing.chunk_present].no_of_packets<clients[present_client].database_client.chunk_playing.no_of_packets)
                 {
                     write_to_file(present_client,clients[present_client].database_client.chunk_playing.chunk_present,clients[present_client].database_client.chunk_playing.no_of_packets);
-                    clients[present_client].database_client.chunk_present[clients[present_client].database_client.chunk_playing.chunk_present].no_of_packets = clients[present_client].database_client.chunk_playing.no_of_packets
+                    clients[present_client].database_client.chunk_present[clients[present_client].database_client.chunk_playing.chunk_present].no_of_packets = clients[present_client].database_client.chunk_playing.no_of_packets;
+                }
             }
             if((clients[present_client].database_client.chunk_playing.chunk_present==no_of_chunks && clients[present_client].database_client.chunk_playing.no_of_packets>=2000) || !clients[present_client].next_AP_id)
                 reached++;
