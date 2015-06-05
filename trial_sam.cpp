@@ -1,38 +1,35 @@
 #include<bits/stdc++.h>
 using namespace std;
 
+
 struct chunk_structure
 {
-    int no_of_packets;
-    int packets_present[3000];
-    int chunk_present;
+    int no_of_packets;//keeps track of no. of packets present in the current chunk
+    int chunk_present;//checks whether chunk is present or not.... if present gives the chunk index
 };
 
 struct database_client_structure
 {
-    chunk_structure *chunk_present;
-    int no_of_chunks_present_in_client;
-    int chunk_id_playing;
-    chunk_structure chunk_playing;
+    chunk_structure *chunk_present;//keeps track of all the chunks of the client
+    chunk_structure chunk_playing;//keeps track of whick chunk is currently being played
 };
 
 struct client_structure
 {
     int client_id;
-    list<int> path;
-    list<int> faulty_aps;
+    list<int> path;//keeps tracks of the aps
+    list<int> faulty_aps;//keeps track of the aps which are faulty
     int no_of_AP;
     int present_AP_id;
     database_client_structure database_client;
     pair <float,float> co_ordinates_client;
     int state;
     int next_AP_id;
-
 };
 
+//presents the structure of the request of the client
 struct request_client_to_AP
 {
-    int no_of_chunks_to_download;
     list<int> download_chunk;
 };
 
@@ -40,7 +37,6 @@ struct AP_structure
 {
     int AP_id;
     pair <float,float>  AP_coordinates;
-    request_client_to_AP request_sheet[300];
     list<int> chunks_present_in_AP;
     int no_of_chunks_present_in_AP;
 };
@@ -53,7 +49,6 @@ void assign_path_to_client(client_structure &obj,int path_no)
     int co=0,res,k=0;
     while(getline(all_paths_handle,line) && co<path_no-1)
         co++;
-    getline(all_paths_handle,line);
     co=0;
     for(int i=0;line[i]!='\0';i++)
     {
@@ -82,7 +77,6 @@ void assign_chunks(AP_structure &obj,int id)
     ap_distribution.open("chunk_distribution");
     while(getline(ap_distribution,line) && i<id-1)
         i++;
-    getline(ap_distribution,line);
     i=0;
     while(line[i]!=' ')
     {
@@ -92,7 +86,7 @@ void assign_chunks(AP_structure &obj,int id)
     obj.no_of_chunks_present_in_AP=res;
     i++;
     res=0;
-    for(int j=i;line[j]!='\0';j++)
+    for(int j=i+1;line[j]!='\0';j++)
     {
         if(line[j]!=' ')
             res=res*10 + line[j]-'0';
@@ -111,7 +105,6 @@ void initialize_position(client_structure &obj,int i,int path_no)
     assign_path_to_client(obj,path_no);
     obj.client_id=i;
     obj.present_AP_id=-1;
-    obj.database_client.no_of_chunks_present_in_client=0;
     obj.next_AP_id=obj.path.front();
 }
 
@@ -123,7 +116,6 @@ void assign_coordinates(AP_structure &obj,int id)
     string line,res;
     while(getline(ap_coordinate_handle,line) && no_of_lines<id-1)
         no_of_lines++;
-    getline(ap_coordinate_handle,line);
     ap_coordinate_handle.close();
     int i1,i2;
     for(i1=0;line[i1]!=' ';i1++)
@@ -139,14 +131,11 @@ void assign_coordinates(AP_structure &obj,int id)
 request_client_to_AP make_request(client_structure &client,AP_structure &AP)
 {
     request_client_to_AP request;
-    request.no_of_chunks_to_download=0;
     for (list<int>::iterator it=AP.chunks_present_in_AP.begin(); it != AP.chunks_present_in_AP.end(); ++it)
     {
         if(client.database_client.chunk_present[*it].chunk_present!=1 || client.database_client.chunk_present[*it].no_of_packets<2000)
         {
-            request.no_of_chunks_to_download++;
             request.download_chunk.push_back(*it);
-
         }
     }
     return request;
@@ -169,6 +158,8 @@ int main(int arg, char *argv[])
     if(arg!=7)
         exit(0);
 
+    //usage: program_name <IN:no_of_paths> <IN:no_of_clients_per_path> <IN:speed> <IN:total_no_of_aps> <IN:no_of_chunks> <IN:inter_ap_distance>
+
     float percent_set_up=0.15;
     float tick_time=0.000137;
     tick_time=(1+percent_set_up)*tick_time;
@@ -184,8 +175,8 @@ int main(int arg, char *argv[])
     int inter_ap_dist=stoi(argv[6],nullptr,10);
 
     client_structure *clients=new client_structure[no_of_clients];
-    AP_structure *APs=new AP_structure[tot_no_of_AP];
-    chunk_structure *chunks=new chunk_structure[no_of_chunks];
+    AP_structure *APs=new AP_structure[tot_no_of_AP+1];
+    chunk_structure *chunks=new chunk_structure[no_of_chunks+1];
 
     /*randomly selecting paths*/
     fstream all_paths_handle;
@@ -195,12 +186,13 @@ int main(int arg, char *argv[])
     while(getline(all_paths_handle,line))
         no_of_all_paths++;
     all_paths_handle.close();
+
     int *random_paths=new int[no_of_paths];
     int countt=0,r,i,k;
     while(countt<no_of_paths)
     {
         srand(time(NULL));
-        r=rand() % no_of_paths + 1;
+        r=rand() % no_of_all_paths + 1;
         for(i=0;i<no_of_paths;i++)
         {
             if(random_paths[i]==r)
@@ -217,8 +209,8 @@ int main(int arg, char *argv[])
     {
 
         k=i/no_of_paths;
+        clients[i].state=0;
         initialize_position(clients[i],i,random_paths[k]);
-        clients[i].database_client.no_of_chunks_present_in_client=0;
         clients[i].database_client.chunk_playing.chunk_present=0;
         clients[i].database_client.chunk_playing.no_of_packets=0;
         clients[i].database_client.chunk_present=new chunk_structure[no_of_chunks];
@@ -230,27 +222,28 @@ int main(int arg, char *argv[])
     }
 
     /*Initializing AP with chunks and co-ordinates*/
-    for(i=0;i<tot_no_of_AP;i++)
+    for(i=1;i<=tot_no_of_AP;i++)
     {
         assign_chunks(APs[i],i);
         assign_coordinates(APs[i],i);
 
     }
 
+
     /*Writing the faulty AP file*/
     float ran;
     ofstream faulty_ap_handle("faulty_ap_list.txt", ios_base::app | ios_base::out);
     for(i=0;i<no_of_clients;i++)
     {
-        for(int j=0;j<clients[i].no_of_AP;j++)
+        for (list<int>::iterator it=clients[i].path.begin(); it != clients[i].path.end(); ++it)
         {
             srand(time(NULL));
             ran=(float)(rand() % 100);
             ran=ran/100;
-            if(ran<=randomize)
+            if(ran>=randomize)
             {
-               faulty_ap_handle<<j<<" ";
-               clients[i].faulty_aps.push_back(j);
+               faulty_ap_handle<<*it<<" ";
+               clients[i].faulty_aps.push_back(*it);
             }
         }
         faulty_ap_handle<<"\n";
@@ -260,17 +253,14 @@ int main(int arg, char *argv[])
 
     /*Running the main loop*/
     int reached=0;
-    long int* position_file = new long int[no_of_clients];
-    int *index_of_packet_playing = new int[no_of_clients];
-    int *index_of_chunk_downloading = new int[no_of_clients];
-    int *index_of_chunk_playing = new int[no_of_clients];
-    int *index_of_packet_downloading = new int[no_of_clients];
+    long int* position_file = new long int[no_of_clients];//marks the position to be read from the mobility file
+    int *index_of_chunk_downloading = new int[no_of_clients];//marks the packet downloading
+    int *index_of_packet_downloading = new int[no_of_clients];//marks the packet downloading
 
-    memset(index_of_packet_playing,0,sizeof(index_of_packet_downloading));
-    memset(index_of_packet_downloading,0,sizeof(index_of_packet_playing));
+    memset(index_of_packet_downloading,0,sizeof(index_of_packet_downloading));
     memset(index_of_chunk_downloading,0,sizeof(index_of_chunk_downloading));
-    memset(index_of_chunk_playing,0,sizeof(index_of_chunk_playing));
     memset(position_file,0,sizeof(position_file));
+
     string coor,res,p1=".txt",s1;
     char c;
     ifstream work;
@@ -281,7 +271,8 @@ int main(int arg, char *argv[])
 
         for(int present_client=0;present_client<no_of_clients;present_client++)
         {
-
+            if(clients[present_client].state==3)
+                continue;
             ostringstream buffer;
             buffer<<"client_"<<present_client;
             s1=buffer.str();
@@ -301,7 +292,7 @@ int main(int arg, char *argv[])
                 res+=c;
                 work>>c;
             }
-            position_file[present_client]=(long int)work.tellg()+1;
+            position_file[present_client]=(long int)work.tellg();
             clients[present_client].co_ordinates_client.second=stof(res,nullptr);
             work.close();
             if(clients[present_client].state==0)
@@ -313,7 +304,10 @@ int main(int arg, char *argv[])
                 {
                     clients[present_client].present_AP_id=clients[present_client].next_AP_id;
                     clients[present_client].path.pop_front();
-                    clients[present_client].next_AP_id=clients[present_client].path.front();
+                    if(!clients[present_client].path.empty())
+                        clients[present_client].next_AP_id=clients[present_client].path.front();
+                    else
+                        clients[present_client].next_AP_id=0;
                     clients[present_client].state=1;
                 }
                 else
@@ -345,7 +339,6 @@ int main(int arg, char *argv[])
                 x=clients[present_client].co_ordinates_client.first-APs[clients[present_client].present_AP_id].AP_coordinates.first;
                 y=clients[present_client].co_ordinates_client.second-APs[clients[present_client].present_AP_id].AP_coordinates.second;
                 dist=(float)sqrt(pow(x,2)+pow(y,2));
-                int flag=0;
                 if(dist<=inter_ap_dist)
                 {
                     while(!request[present_client].download_chunk.empty())
@@ -384,7 +377,10 @@ int main(int arg, char *argv[])
                 }
             }
             if((clients[present_client].database_client.chunk_playing.chunk_present==no_of_chunks && clients[present_client].database_client.chunk_playing.no_of_packets>=2000) || !clients[present_client].next_AP_id)
+            {
                 reached++;
+                clients[present_client].state=3;
+            }
         }
     }
     return 0;
