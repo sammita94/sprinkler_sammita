@@ -147,7 +147,7 @@ void write_to_file(int client_no,int chunk_no,int packet_no)
     p1=p1+to_string(client_no);
     p1=p1+".txt";
     ofstream work;
-    work.open(p1.c_str());
+    work.open(p1.c_str(), ios_base::app);
     line = line + to_string(chunk_no) + ":" + to_string(packet_no) + "\n";
     work.close();
 
