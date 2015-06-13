@@ -7,9 +7,10 @@ double gettime(string line)
 {
     int i=0;
     string res;
+    //cout<<line<<"in gettime";
     while(line[i]!=' ')
         res+=line[i++];
-    double s=stof(res,nullptr);
+    double s=stod(res,nullptr);
     return s;
 }
 
@@ -25,12 +26,12 @@ pair <double,double> get_xy(string line)
     string res;
     while(line[i]!=' ')
         res+=line[i++];
-    point.first=stof(res,nullptr);
+    point.first=stod(res,nullptr);
     i++;
     res="";
     while(line[i]!=' ')
         res+=line[i++];
-    point.second = stof(res,nullptr);
+    point.second = stod(res,nullptr);
     return point;
 
 }
@@ -54,15 +55,16 @@ pair<double,double> generate_next_point(pair<double,double> point,double angle,d
     return next_point;
 }
 
-int main(int arg, char *argv[])
+int main(int argc, char *argv[])
 {
-    if(arg!=3)
+    if(argc!=3)
         exit(0);
 
     int no_of_clients=stoi(argv[1],nullptr,10);
-    int speed=stof(argv[2],nullptr);
+    //cout<<no_of_clients;
+    float speed=stof(argv[2],nullptr);
+    //cout<<speed;
     int present_client,no_of_lines;
-    ifstream client_read_handle;
     string line;
 
     float percent_set_up=0.15;
@@ -71,54 +73,75 @@ int main(int arg, char *argv[])
 
     for(present_client=0;present_client<no_of_clients;present_client++)
     {
+
+        ifstream client_read_handle;
+        ifstream client_read_lines_handle;
+        //cout<<"Loop start"<<present_client<<endl;
         string str="client_";
+        //cout<<str;
         str=str+to_string(present_client);
+        //cout<<str;
         str=str+".txt";
 
-        string str2="client_mob_";
-        str2=str2+to_string(present_client);
-        str2=str2+".txt";
-
-        ofstream client_write_handle;
-        client_write_handle.open(str2.c_str(),ios_base::app);
-
+        //cout<<str;
         no_of_lines=0;
+
         client_read_handle.open(str.c_str());
-        while(getline(client_read_handle,line))
+        client_read_lines_handle.open(str.c_str());
+
+
+        while(getline(client_read_lines_handle,line))
             no_of_lines++;
-        client_read_handle.close();
-        client_read_handle.open(str.c_str());
+
+
+
+
+        //cout<<no_of_lines<<"..lines";
+        //client_read_handle.seekg (0, client_read_handle.beg);
+        //getline(client_read_handle,line);
         double start_time=0.0,finish_time,next_time,current_time;
         pair <double,double> co_or_start,co_or_finish,trial_point;
         double m=0.0,dist_total,dist,dist_trial,angle;
-        co_or_start.first=0.0;
-        co_or_start.second=0.0;
         dist = tick_time * speed;
-
+        getline(client_read_handle,line);
+        no_of_lines--;
+        start_time = gettime(line);
+        co_or_start= get_xy(line);
         while(no_of_lines--)
         {
-            getline(client_read_handle,line);
-            next_time = gettime(line);
-            co_or_finish = get_xy(line);
-            trial_point.first = co_or_finish.first;
-            trial_point.second = co_or_finish.second;
-            dist_trial = pow((co_or_start.first-trial_point.first),2)+pow((co_or_start.second-trial_point.second),2);
-            dist_trial = sqrt(dist_trial);
-            dist_total = pow((co_or_finish.first-co_or_start.first),2)+pow((co_or_finish.second-co_or_start.second),2);
-            current_time = start_time;
-            angle = (co_or_finish.second-co_or_start.second)/(co_or_finish.first-co_or_start.first);
-            angle = atan (angle) * 180 / PI;
-            while(dist_trial<=dist_total)
-            {
-                write_output_file(present_client,current_time,trial_point);
-                current_time = current_time + tick_time;
-                trial_point = generate_next_point(trial_point,angle,dist);
+
+
+                getline(client_read_handle,line);
+
+                cout<<line;
+                co_or_finish = get_xy(line);
+
+                trial_point = generate_next_point(co_or_start,angle,dist);
+
                 dist_trial = pow((co_or_start.first-trial_point.first),2)+pow((co_or_start.second-trial_point.second),2);
                 dist_trial = sqrt(dist_trial);
-            }
-            co_or_start=co_or_finish;
-        }
+                dist_total = pow((co_or_finish.first-co_or_start.first),2)+pow((co_or_finish.second-co_or_start.second),2);
+                dist_total = sqrt(dist_total);
+                current_time = start_time;
+                finish_time = gettime(line);
+                angle = (co_or_finish.second-co_or_start.second)/(co_or_finish.first-co_or_start.first);
+                angle = atan (angle) * 180 / PI;
 
+                while(dist_trial<=dist_total)
+                {
+
+                    write_output_file(present_client,current_time,trial_point);
+                    current_time = current_time + tick_time;
+                    trial_point = generate_next_point(trial_point,angle,dist);
+                    dist_trial = dist_trial+dist;
+                //cout<<dist_trial<<"..."<<dist_total<<endl;
+                }
+                co_or_start=co_or_finish;
+                start_time = finish_time;
+
+            }
+            client_read_handle.close();
+            client_read_lines_handle.close();
 
     }
     return 0;
